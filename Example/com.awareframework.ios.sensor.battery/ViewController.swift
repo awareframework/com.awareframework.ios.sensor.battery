@@ -7,12 +7,40 @@
 //
 
 import UIKit
+import com_awareframework_ios_sensor_battery
 
 class ViewController: UIViewController {
+    
+    var sensor:BatterySensor?
 
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view, typically from a nib.
+        sensor = BatterySensor.init(BatterySensor.Config().apply{config in
+            config.debug = true
+            config.sensorObserver = Observer()
+        })
+        sensor?.start()
+    }
+    
+    class Observer:BatteryObserver{
+        func onBatteryChanged(data: BatteryData) {
+            print(data)
+        }
+        
+        func onBatteryLow() {
+            print(#function)
+        }
+        
+        func onBatteryCharging() {
+            print(#function)
+        }
+        
+        func onBatteryDischarging() {
+            print(#function)
+        }
+        
+        
     }
 
     override func didReceiveMemoryWarning() {

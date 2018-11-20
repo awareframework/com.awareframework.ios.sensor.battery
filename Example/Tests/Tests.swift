@@ -1,5 +1,5 @@
 import XCTest
-import com.awareframework.ios.sensor.battery
+import com_awareframework_ios_sensor_battery
 
 class Tests: XCTestCase {
     
