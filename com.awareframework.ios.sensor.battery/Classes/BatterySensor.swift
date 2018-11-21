@@ -109,7 +109,7 @@ public class BatterySensor: AwareSensor {
     
     public static let ACTION_AWARE_BATTERY_SYNC = "com.awareframework.android.sensor.battery.SENSOR_SYNC"
     
-    var CONFIG = Config()
+    public var CONFIG = Config()
     
     public class Config:SensorConfig{
     
