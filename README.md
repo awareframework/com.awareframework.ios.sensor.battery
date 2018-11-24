@@ -29,7 +29,7 @@ import com_awareframework_ios_sensor_battery
 
 ### BatterySensor
 
-* `init(config:MagnetometerSensor.Config?)` : Initializes the magnetometer sensor with the optional configuration.
+* `init(config:BatterySensor.Config?)` : Initializes the battery sensor with the optional configuration.
 * `start()`: Starts the gyroscope sensor with the optional configuration.
 * `stop()`: Stops the service.
 
