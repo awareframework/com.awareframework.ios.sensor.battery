@@ -120,9 +120,8 @@ public class BatterySensor: AwareSensor {
             dbPath = "aware_battery"
         }
     
-        public convenience init(_ json:JSON){
+        public convenience init(_ config:Dictionary<String,Any>){
             self.init()
-            
         }
     
         public func apply(closure:(_ config: BatterySensor.Config ) -> Void ) -> Self {
@@ -163,21 +162,21 @@ public class BatterySensor: AwareSensor {
     override public func start() {
         NotificationCenter.default.addObserver(self,
                                                selector: #selector(batteryStateDidChange(notification:)),
-                                               name: .UIDeviceBatteryStateDidChange,
+                                               name: UIDevice.batteryStateDidChangeNotification,
                                                object: nil)
         NotificationCenter.default.addObserver(self,
                                                selector: #selector(batteryLevelDidChange(notification:)),
-                                               name: .UIDeviceBatteryLevelDidChange,
+                                               name: UIDevice.batteryLevelDidChangeNotification,
                                                object: nil)
         self.notificationCenter.post(name: .actionAwareBatteryStart , object: nil)
     }
     
     override public func stop() {
         NotificationCenter.default.removeObserver(self,
-                                                  name: NSNotification.Name.UIDeviceBatteryStateDidChange,
+                                                  name: UIDevice.batteryStateDidChangeNotification,
                                                   object: nil)
         NotificationCenter.default.removeObserver(self,
-                                                  name: NSNotification.Name.UIDeviceBatteryLevelDidChange,
+                                                  name: UIDevice.batteryLevelDidChangeNotification,
                                                   object: nil)
         self.notificationCenter.post(name: .actionAwareBatteryStop , object: nil)
     }

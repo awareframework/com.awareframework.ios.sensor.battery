@@ -1,4 +1,4 @@
-# Aware Battery
+# AWARE: Battery
 
 [![CI Status](http://img.shields.io/travis/awareframework/com.awareframework.ios.sensor.battery.svg?style=flat)](https://travis-ci.org/awareframework/com.awareframework.ios.sensor.battery)
 [![Version](https://img.shields.io/cocoapods/v/com.awareframework.ios.sensor.battery.svg?style=flat)](http://cocoapods.org/pods/com.awareframework.ios.sensor.battery)
@@ -30,9 +30,8 @@ import com_awareframework_ios_sensor_battery
 ### BatterySensor
 
 * `init(config:BatterySensor.Config?)` : Initializes the battery sensor with the optional configuration.
-* `start()`: Starts the gyroscope sensor with the optional configuration.
+* `start()`: Starts the battery sensor with the optional configuration.
 * `stop()`: Stops the service.
-
 
 ### BatterySensor.Config
 
@@ -149,7 +148,7 @@ class Observer:BatteryObserver {
 
 ## Author
 
-Yuuki Nishiyama, tetujin@ht.sfc.keio.ac.jp
+Yuuki Nishiyama, yuuki.nishiyama@oulu.fi
 
 ## Related links
 * [ Apple | Battery State ](https://developer.apple.com/documentation/uikit/uidevice/batterystate)
