@@ -8,7 +8,7 @@
 
 Pod::Spec.new do |s|
   s.name             = 'com.awareframework.ios.sensor.battery'
-  s.version       = '0.2.0'
+  s.version       = '0.2.1'
   s.summary          = 'Battery Sensor Module for AWARE Framework.'
 
 # This description is used to generate tags and improve search results.
@@ -21,7 +21,7 @@ Pod::Spec.new do |s|
 **Aware Battery** (com.awareframework.ios.sensor.battery) is a plugin for AWARE Framework which is one of an open-source context-aware instrument. This plugin allows us to handle battery conditions and events.
                        DESC
 
-  s.homepage         = 'https://github.com/AWARE-team/com.awareframework.ios.sensor.battery'
+  s.homepage         = 'https://github.com/awareframework/com.awareframework.ios.sensor.battery'
   # s.screenshots     = 'www.example.com/screenshots_1', 'www.example.com/screenshots_2'
   s.license          = { :type => 'Apache2', :file => 'LICENSE' }
   s.author           = { 'tetujin' => 'tetujin@ht.sfc.keio.ac.jp' }
