@@ -40,7 +40,6 @@ class ViewController: UIViewController {
             print(#function)
         }
         
-        
     }
 
     override func didReceiveMemoryWarning() {

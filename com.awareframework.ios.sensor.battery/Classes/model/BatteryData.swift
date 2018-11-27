@@ -10,9 +10,10 @@ import com_awareframework_ios_sensor_core
 
 public class BatteryData: AwareObject {
     public static var TABLE_NAME = "batteryData"
-    var status: Int  = 0
-    var level:  Int   = 0
-    var scale:  Int   = 0
+    
+    @objc dynamic public var status: Int  = 0
+    @objc dynamic public var level:  Int   = 0
+    @objc dynamic public var scale:  Int   = 0
 
     /** iOS does not support following parameter */
 //    var voltage: Int = 0

@@ -41,6 +41,6 @@ Pod::Spec.new do |s|
   # s.public_header_files = 'Pod/Classes/**/*.h'
   # s.frameworks = 'UIKit', 'MapKit'
   # s.dependency 'AFNetworking', '~> 2.3'
-  s.dependency 'com.awareframework.ios.sensor.core'
+  s.dependency 'com.awareframework.ios.sensor.core', '~> 0.3.1'
   
 end

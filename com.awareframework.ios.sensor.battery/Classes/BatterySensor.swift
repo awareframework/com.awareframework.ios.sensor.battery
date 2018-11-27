@@ -120,10 +120,6 @@ public class BatterySensor: AwareSensor {
             dbPath = "aware_battery"
         }
     
-        public convenience init(_ config:Dictionary<String,Any>){
-            self.init()
-        }
-    
         public func apply(closure:(_ config: BatterySensor.Config ) -> Void ) -> Self {
             closure(self)
             return self
@@ -232,30 +228,35 @@ public class BatterySensor: AwareSensor {
         // The battery's level did change (98%, 99%, ...)
         let currentBatteryLevel:Int = Int(UIDevice.current.batteryLevel * 100);
         let currentBatteryState = UIDevice.current.batteryState
-        if let engin = self.dbEngine {
-            let data = BatteryData()
-            data.level = currentBatteryLevel
-            data.scale = 100
-            switch currentBatteryState{
-            case .unknown:
-                data.status = 1
-                break
-            case .unplugged:
-                data.status = 3
-                break
-            case .charging:
-                data.status = 2
-                break
-            case .full:
-                data.status = 5
-                break
-            }
-            engin.save(data, BatteryData.TABLE_NAME)
-            self.notificationCenter.post(name: .actionAwareBatteryChanged , object: nil)
-            if let observer = self.CONFIG.sensorObserver{
-                observer.onBatteryChanged(data: data)
-            }
+        
+        let data = BatteryData()
+        data.level = currentBatteryLevel
+        data.scale = 100
+        switch currentBatteryState{
+        case .unknown:
+            data.status = 1
+            break
+        case .unplugged:
+            data.status = 3
+            break
+        case .charging:
+            data.status = 2
+            break
+        case .full:
+            data.status = 5
+            break
         }
+        
+        if let engin = self.dbEngine {
+            engin.save(data, BatteryData.TABLE_NAME)
+        }
+        
+        self.notificationCenter.post(name: .actionAwareBatteryChanged , object: nil)
+        
+        if let observer = self.CONFIG.sensorObserver{
+            observer.onBatteryChanged(data: data)
+        }
+
         if currentBatteryLevel < 15 {
             self.notificationCenter.post(name: .actionAwareBatteryLow , object: nil)
             if let observer = self.CONFIG.sensorObserver{
