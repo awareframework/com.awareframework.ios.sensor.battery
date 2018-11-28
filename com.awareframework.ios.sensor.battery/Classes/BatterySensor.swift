@@ -179,7 +179,7 @@ public class BatterySensor: AwareSensor {
     
     override public func sync(force: Bool) {
         if let engin = self.dbEngine {
-            engin.startSync(BatteryData.TABLE_NAME, DbSyncConfig.init().apply{ config in
+            engin.startSync(BatteryData.TABLE_NAME, BatteryData.self, DbSyncConfig.init().apply{ config in
                 config.debug = CONFIG.debug
             })
         }
