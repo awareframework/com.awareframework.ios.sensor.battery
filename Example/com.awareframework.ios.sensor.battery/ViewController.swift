@@ -19,6 +19,7 @@ class ViewController: UIViewController {
         sensor = BatterySensor.init(BatterySensor.Config().apply{config in
             config.debug = true
             config.sensorObserver = Observer()
+            config.dbType = .REALM
         })
         sensor?.start()
     }

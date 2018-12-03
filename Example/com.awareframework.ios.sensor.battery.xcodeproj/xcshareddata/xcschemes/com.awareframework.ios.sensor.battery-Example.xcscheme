@@ -14,6 +14,62 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
+               BlueprintIdentifier = "CD4CE6C7BDAB8DF997D75F209507F003"
+               BuildableName = "Pods_com_awareframework_ios_sensor_battery_Example.framework"
+               BlueprintName = "Pods-com.awareframework.ios.sensor.battery_Example"
+               ReferencedContainer = "container:Pods/Pods.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "2581E39D0A25DADF5BAD2AAAB3D7AFA8"
+               BuildableName = "Pods_com_awareframework_ios_sensor_battery_Tests.framework"
+               BlueprintName = "Pods-com.awareframework.ios.sensor.battery_Tests"
+               ReferencedContainer = "container:Pods/Pods.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "99BE8DB6239129B203E353160A2BC5AA"
+               BuildableName = "com_awareframework_ios_sensor_battery.framework"
+               BlueprintName = "com.awareframework.ios.sensor.battery"
+               ReferencedContainer = "container:Pods/Pods.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "46A8D17E42C23AEB4D5258B8BF6042BF"
+               BuildableName = "com_awareframework_ios_sensor_core.framework"
+               BlueprintName = "com.awareframework.ios.sensor.core"
+               ReferencedContainer = "container:Pods/Pods.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "YES"
+            buildForProfiling = "YES"
+            buildForArchiving = "YES"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
                BlueprintIdentifier = "607FACCF1AFB9204008FA782"
                BuildableName = "com.awareframework.ios.sensor.battery_Example.app"
                BlueprintName = "com.awareframework.ios.sensor.battery_Example"

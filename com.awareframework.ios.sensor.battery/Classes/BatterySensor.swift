@@ -164,6 +164,9 @@ public class BatterySensor: AwareSensor {
                                                selector: #selector(batteryLevelDidChange(notification:)),
                                                name: UIDevice.batteryLevelDidChangeNotification,
                                                object: nil)
+        self.batteryLevelDidChange(notification: NSNotification.init(name: UIDevice.batteryLevelDidChangeNotification, object: nil))
+        self.batteryStateDidChange(notification: NSNotification.init(name: UIDevice.batteryStateDidChangeNotification, object: nil))
+        
         self.notificationCenter.post(name: .actionAwareBatteryStart , object: nil)
     }
     
@@ -179,9 +182,12 @@ public class BatterySensor: AwareSensor {
     
     override public func sync(force: Bool) {
         if let engin = self.dbEngine {
-            engin.startSync(BatteryData.TABLE_NAME, BatteryData.self, DbSyncConfig.init().apply{ config in
+            let config = DbSyncConfig.init().apply{ config in
                 config.debug = CONFIG.debug
-            })
+            }
+            engin.startSync(BatteryData.TABLE_NAME, BatteryData.self, config)
+            engin.startSync(BatteryCharge.TABLE_NAME, BatteryCharge.self, config)
+            engin.startSync(BatteryDischarge.TABLE_NAME, BatteryDischarge.self, config)
         }
         self.notificationCenter.post(name: .actionAwareBatterySync , object: nil)
     }
