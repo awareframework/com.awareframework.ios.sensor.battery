@@ -39,7 +39,7 @@ Class to hold the configuration of the sensor.
 
 #### Fields
 
-+ `sensorObserver: BatterySensor.Observer`: Callback for live data updates.
++ `sensorObserver: BatteryObserver`: Callback for live data updates.
 + `enabled: Boolean` Sensor is enabled or not. (default = `false`)
 + `debug: Boolean` enable/disable logging to `Logcat`. (default = `false`)
 + `label: String` Label for the data. (default = "")
