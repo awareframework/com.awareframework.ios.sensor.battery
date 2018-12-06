@@ -10,6 +10,7 @@ import com_awareframework_ios_sensor_core
 import SwiftyJSON
 
 extension Notification.Name {
+    public static let actionAwareBattery    = Notification.Name(BatterySensor.ACTION_AWARE_BATTERY)
     public static let actionAwareBatteryStart    = Notification.Name(BatterySensor.ACTION_AWARE_BATTERY_START)
     public static let actionAwareBatteryStop     = Notification.Name(BatterySensor.ACTION_AWARE_BATTERY_STOP)
     public static let actionAwareBatterySync     = Notification.Name(BatterySensor.ACTION_AWARE_BATTERY_SYNC)
@@ -40,6 +41,15 @@ public class BatterySensor: AwareSensor {
     public static var TAG = "AWARE::Battery"
     
     // Sensor actions
+    public static let ACTION_AWARE_BATTERY = "com.awareframework.ios.sensor.battery"
+    
+    public static let ACTION_AWARE_BATTERY_START = "com.awareframework.ios.sensor.battery.SENSOR_START"
+    public static let ACTION_AWARE_BATTERY_STOP = "com.awareframework.ios.sensor.battery.SENSOR_STOP"
+    
+    public static let ACTION_AWARE_BATTERY_SET_LABEL = "com.awareframework.ios.sensor.battery.ACTION_AWARE_BATTERY_SET_LABEL"
+    public static var EXTRA_LABEL = "label"
+    
+    public static let ACTION_AWARE_BATTERY_SYNC = "com.awareframework.ios.sensor.battery.SENSOR_SYNC"
     
     /**
      * Broadcasted event: the battery values just changed
@@ -101,14 +111,6 @@ public class BatterySensor: AwareSensor {
      */
     public static let STATUS_PHONE_BOOTED = -3 // TODO
     
-    public static let ACTION_AWARE_BATTERY_START = "com.awareframework.android.sensor.battery.SENSOR_START"
-    public static let ACTION_AWARE_BATTERY_STOP = "com.awareframework.android.sensor.battery.SENSOR_STOP"
-    
-    public static let ACTION_AWARE_BATTERY_SET_LABEL = "com.awareframework.android.sensor.battery.ACTION_AWARE_BATTERY_SET_LABEL"
-    public static var EXTRA_LABEL = "label"
-    
-    public static let ACTION_AWARE_BATTERY_SYNC = "com.awareframework.android.sensor.battery.SENSOR_SYNC"
-    
     public var CONFIG = Config()
     
     public class Config:SensorConfig{
@@ -147,7 +149,6 @@ public class BatterySensor: AwareSensor {
         CONFIG = config
         initializeDbEngine(config: config)
         UIDevice.current.isBatteryMonitoringEnabled = true
-
     }
     
     deinit {
@@ -180,7 +181,7 @@ public class BatterySensor: AwareSensor {
         self.notificationCenter.post(name: .actionAwareBatteryStop , object: nil)
     }
     
-    override public func sync(force: Bool) {
+    override public func sync(force: Bool = false) {
         if let engin = self.dbEngine {
             let config = DbSyncConfig.init().apply{ config in
                 config.debug = CONFIG.debug
@@ -188,8 +189,8 @@ public class BatterySensor: AwareSensor {
             engin.startSync(BatteryData.TABLE_NAME, BatteryData.self, config)
             engin.startSync(BatteryCharge.TABLE_NAME, BatteryCharge.self, config)
             engin.startSync(BatteryDischarge.TABLE_NAME, BatteryDischarge.self, config)
+            self.notificationCenter.post(name: .actionAwareBatterySync , object: nil)
         }
-        self.notificationCenter.post(name: .actionAwareBatterySync , object: nil)
     }
     
     /////////
@@ -228,6 +229,7 @@ public class BatterySensor: AwareSensor {
             self.notificationCenter.post(name: .actionAwareBatteryFull , object: nil)
             break
         }
+        self.notificationCenter.post(name: .actionAwareBattery, object: nil)
     }
     
     @objc func batteryLevelDidChange(notification: NSNotification){
@@ -257,8 +259,6 @@ public class BatterySensor: AwareSensor {
             engin.save(data, BatteryData.TABLE_NAME)
         }
         
-        self.notificationCenter.post(name: .actionAwareBatteryChanged , object: nil)
-        
         if let observer = self.CONFIG.sensorObserver{
             observer.onBatteryChanged(data: data)
         }
@@ -269,5 +269,14 @@ public class BatterySensor: AwareSensor {
                 observer.onBatteryLow()
             }
         }
+        self.notificationCenter.post(name: .actionAwareBattery, object: nil)
     }
+    
+    public func set(label:String){
+        self.CONFIG.label = label
+        self.notificationCenter.post(name: .actionAwareBatterySetLabel,
+                                     object: nil,
+                                     userInfo: [BatterySensor.EXTRA_LABEL:label])
+    }
+    
 }

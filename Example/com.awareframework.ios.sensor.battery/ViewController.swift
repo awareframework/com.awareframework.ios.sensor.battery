@@ -16,12 +16,12 @@ class ViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view, typically from a nib.
-        sensor = BatterySensor.init(BatterySensor.Config().apply{config in
-            config.debug = true
-            config.sensorObserver = Observer()
-            config.dbType = .REALM
-        })
-        sensor?.start()
+//        sensor = BatterySensor.init(BatterySensor.Config().apply{config in
+//            config.debug = true
+//            config.sensorObserver = Observer()
+//            config.dbType = .REALM
+//        })
+//        sensor?.start()
     }
     
     class Observer:BatteryObserver{
