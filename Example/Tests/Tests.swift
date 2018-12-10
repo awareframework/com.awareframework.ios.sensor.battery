@@ -1,6 +1,7 @@
 import XCTest
 import RealmSwift
 import com_awareframework_ios_sensor_battery
+import com_awareframework_ios_sensor_core
 
 class Tests: XCTestCase {
     
@@ -15,23 +16,6 @@ class Tests: XCTestCase {
         super.tearDown()
     }
     
-    func testSync(){
-        //        let sensor = BatterySensor.init(BatterySensor.Config().apply{ config in
-        //            config.debug = true
-        //            config.dbType = .REALM
-        //        })
-        //        sensor.start();
-        //        sensor.enable();
-        //        sensor.sync(force: true)
-        
-        //        let syncManager = DbSyncManager.Builder()
-        //            .setBatteryOnly(false)
-        //            .setWifiOnly(false)
-        //            .setSyncInterval(1)
-        //            .build()
-        //
-        //        syncManager.start()
-    }
     
     func testObserver(){
         class Observer:BatteryObserver{
@@ -160,4 +144,144 @@ class Tests: XCTestCase {
         XCTAssertEqual(dict["level"] as! Int, 0)
         XCTAssertEqual(dict["scale"] as! Int, 0)
     }
+    
+    
+    
+    func testSyncModule(){
+        #if targetEnvironment(simulator)
+        
+        print("This test requires a real device.")
+        
+        #else
+        // success //
+        let sensor = BatterySensor.init(BatterySensor.Config().apply{ config in
+            config.debug = true
+            config.dbType = .REALM
+            config.dbHost = "node.awareframework.com:1001"
+            config.dbPath = "sync_db"
+        })
+        if let engine = sensor.dbEngine as? RealmEngine {
+            engine.removeAll(BatteryData.self)
+            for _ in 0..<100 {
+                engine.save(BatteryData())
+            }
+        }
+        let successExpectation = XCTestExpectation(description: "success sync")
+        let observer = NotificationCenter.default.addObserver(forName: Notification.Name.actionAwareBatterySyncCompletion,
+                                                              object: sensor, queue: .main) { (notification) in
+                                                                if let userInfo = notification.userInfo{
+                                                                    if let status = userInfo["status"] as? Bool {
+                                                                        if status == true {
+                                                                            successExpectation.fulfill()
+                                                                        }
+                                                                    }
+                                                                }
+        }
+        sensor.sync(force: true)
+        wait(for: [successExpectation], timeout: 20)
+        NotificationCenter.default.removeObserver(observer)
+        
+        ////////////////////////////////////
+        
+        // failure //
+        let sensor2 = BatterySensor.init(BatterySensor.Config().apply{ config in
+            config.debug = true
+            config.dbType = .REALM
+            config.dbHost = "node.awareframework.com.com" // wrong url
+            config.dbPath = "sync_db"
+        })
+        let failureExpectation = XCTestExpectation(description: "failure sync")
+        let failureObserver = NotificationCenter.default.addObserver(forName: Notification.Name.actionAwareBatterySyncCompletion,
+                                                                     object: sensor2, queue: .main) { (notification) in
+                                                                        if let userInfo = notification.userInfo{
+                                                                            if let status = userInfo["status"] as? Bool {
+                                                                                if status == false {
+                                                                                    failureExpectation.fulfill()
+                                                                                }
+                                                                            }
+                                                                        }
+        }
+        if let engine = sensor2.dbEngine as? RealmEngine {
+            engine.removeAll(BatteryData.self)
+            for _ in 0..<100 {
+                engine.save(BatteryData())
+            }
+        }
+        sensor2.sync(force: true)
+        wait(for: [failureExpectation], timeout: 20)
+        NotificationCenter.default.removeObserver(failureObserver)
+        
+        #endif
+    }
+
+    
+    
+    
+    //////////// storage ///////////
+    
+    var realmToken:NotificationToken? = nil
+    
+    func testSensorModule(){
+        
+//        #if targetEnvironment(simulator)
+//
+//        print("This test requires a real device.")
+//
+//        #else
+        
+        let sensor = BatterySensor.init(BatterySensor.Config().apply{ config in
+            config.debug = true
+            config.dbType = .REALM
+            config.dbPath = "sensor_module"
+        })
+        
+        let expect = expectation(description: "sensor module")
+        if let realmEngine = sensor.dbEngine as? RealmEngine {
+            // remove old data
+            realmEngine.removeAll(BatteryData.self)
+            // get a RealmEngine Instance
+            if let realm = realmEngine.getRealmInstance() {
+                // set Realm DB observer
+                realmToken = realm.observe { (notification, realm) in
+                    switch notification {
+                    case .didChange:
+                        // check database size
+                        let results = realm.objects(BatteryData.self)
+                        print(results.count)
+                        XCTAssertGreaterThanOrEqual(results.count, 1)
+                        realm.invalidate()
+                        expect.fulfill()
+                        self.realmToken = nil
+                        break;
+                    case .refreshRequired:
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if let realmEngine = sensor.dbEngine as? RealmEngine {
+            realmEngine.save(BatteryData())
+        }
+        
+//        var storageExpect:XCTestExpectation? = expectation(description: "sensor storage notification")
+//        var token: NSObjectProtocol?
+//        token = NotificationCenter.default.addObserver(forName: Notification.Name.actionAwareBattery,
+//                                                       object: sensor,
+//                                                       queue: .main) { (notification) in
+//                                                        if let exp = storageExpect {
+//                                                            exp.fulfill()
+//                                                            storageExpect = nil
+//                                                            NotificationCenter.default.removeObserver(token!)
+//                                                        }
+//
+//        }
+//
+//        sensor.start() // start sensor
+        
+        wait(for: [expect], timeout: 10)
+        sensor.stop()
+//        #endif
+    }
+
 }

@@ -15,6 +15,7 @@ extension Notification.Name {
     public static let actionAwareBatteryStop     = Notification.Name(BatterySensor.ACTION_AWARE_BATTERY_STOP)
     public static let actionAwareBatterySync     = Notification.Name(BatterySensor.ACTION_AWARE_BATTERY_SYNC)
     public static let actionAwareBatterySetLabel = Notification.Name(BatterySensor.ACTION_AWARE_BATTERY_SET_LABEL)
+    public static let actionAwareBatterySyncCompletion  = Notification.Name(BatterySensor.ACTION_AWARE_BATTERY_SYNC_COMPLETION)
 
     public static let actionAwareBatteryChanged  = Notification.Name(BatterySensor.ACTION_AWARE_BATTERY_CHANGED)
     public static let actionAwareBatteryFull     = Notification.Name(BatterySensor.ACTION_AWARE_BATTERY_FULL)
@@ -43,13 +44,15 @@ public class BatterySensor: AwareSensor {
     // Sensor actions
     public static let ACTION_AWARE_BATTERY = "com.awareframework.ios.sensor.battery"
     
-    public static let ACTION_AWARE_BATTERY_START = "com.awareframework.ios.sensor.battery.SENSOR_START"
-    public static let ACTION_AWARE_BATTERY_STOP = "com.awareframework.ios.sensor.battery.SENSOR_STOP"
+    public static let ACTION_AWARE_BATTERY_START = "com.awareframework.ios.sensor.battery.ACTION_AWARE_BATTERY_START"
+    public static let ACTION_AWARE_BATTERY_STOP = "com.awareframework.ios.sensor.battery.ACTION_AWARE_BATTERY_STOP"
     
     public static let ACTION_AWARE_BATTERY_SET_LABEL = "com.awareframework.ios.sensor.battery.ACTION_AWARE_BATTERY_SET_LABEL"
     public static var EXTRA_LABEL = "label"
     
-    public static let ACTION_AWARE_BATTERY_SYNC = "com.awareframework.ios.sensor.battery.SENSOR_SYNC"
+    public static let ACTION_AWARE_BATTERY_SYNC = "com.awareframework.ios.sensor.battery.ACTION_AWARE_BATTERY_SYNC"
+    
+    public static let ACTION_AWARE_BATTERY_SYNC_COMPLETION = "com.awareframework.ios.sensor.battery.ACTION_AWARE_BATTERY_SYNC_COMPLETION"
     
     /**
      * Broadcasted event: the battery values just changed
@@ -168,7 +171,7 @@ public class BatterySensor: AwareSensor {
         self.batteryLevelDidChange(notification: NSNotification.init(name: UIDevice.batteryLevelDidChangeNotification, object: nil))
         self.batteryStateDidChange(notification: NSNotification.init(name: UIDevice.batteryStateDidChangeNotification, object: nil))
         
-        self.notificationCenter.post(name: .actionAwareBatteryStart , object: nil)
+        self.notificationCenter.post(name: .actionAwareBatteryStart , object: self)
     }
     
     override public func stop() {
@@ -178,18 +181,55 @@ public class BatterySensor: AwareSensor {
         NotificationCenter.default.removeObserver(self,
                                                   name: UIDevice.batteryLevelDidChangeNotification,
                                                   object: nil)
-        self.notificationCenter.post(name: .actionAwareBatteryStop , object: nil)
+        self.notificationCenter.post(name: .actionAwareBatteryStop , object: self)
     }
     
     override public func sync(force: Bool = false) {
         if let engin = self.dbEngine {
             let config = DbSyncConfig.init().apply{ config in
-                config.debug = CONFIG.debug
+                config.debug = self.CONFIG.debug
+                config.dispatchQueue = DispatchQueue(label: "com.awareframework.ios.sensor.barometer.sync.queue")
             }
-            engin.startSync(BatteryData.TABLE_NAME, BatteryData.self, config)
-            engin.startSync(BatteryCharge.TABLE_NAME, BatteryCharge.self, config)
-            engin.startSync(BatteryDischarge.TABLE_NAME, BatteryDischarge.self, config)
-            self.notificationCenter.post(name: .actionAwareBatterySync , object: nil)
+            engin.startSync(BatteryData.TABLE_NAME, BatteryData.self, config.apply{config in
+                config.completionHandler = { (status, error) in
+                    var userInfo: Dictionary<String,Any> = ["status":status,
+                                                            "tableName":BatteryData.TABLE_NAME,
+                                                            "objectType":BatteryData.self]
+                    if let e = error {
+                        userInfo["error"] = e
+                    }
+                    self.notificationCenter.post(name: .actionAwareBatterySyncCompletion ,
+                                                 object: self,
+                                                 userInfo:userInfo)
+                }
+            })
+            engin.startSync(BatteryCharge.TABLE_NAME, BatteryCharge.self, config.apply{config in
+                config.completionHandler = { (status, error) in
+                    var userInfo: Dictionary<String,Any> = ["status":status,
+                                                            "tableName":BatteryCharge.TABLE_NAME,
+                                                            "objectType":BatteryCharge.self]
+                    if let e = error {
+                        userInfo["error"] = e
+                    }
+                    self.notificationCenter.post(name: .actionAwareBatterySyncCompletion ,
+                                                 object: self,
+                                                 userInfo:userInfo)
+                }
+            })
+            engin.startSync(BatteryDischarge.TABLE_NAME, BatteryDischarge.self, config.apply{config in
+                config.completionHandler = { (status, error) in
+                    var userInfo: Dictionary<String,Any> = ["status":status,
+                                                           "tableName":BatteryDischarge.TABLE_NAME,
+                                                           "objectType":BatteryDischarge.self]
+                    if let e = error {
+                        userInfo["error"] = e
+                    }
+                    self.notificationCenter.post(name: .actionAwareBatterySyncCompletion ,
+                                                 object: self,
+                                                 userInfo:userInfo)
+                }
+            })
+            self.notificationCenter.post(name: .actionAwareBatterySync , object: self)
         }
     }
     
@@ -206,30 +246,30 @@ public class BatterySensor: AwareSensor {
         case .unknown:
             break
         case .unplugged:
-            self.notificationCenter.post(name: .actionAwareBatteryDischarging , object: nil)
+            self.notificationCenter.post(name: .actionAwareBatteryDischarging , object: self)
             if let engin = self.dbEngine {
                 let data = BatteryDischarge()
-                engin.save(data, BatteryDischarge.TABLE_NAME)
+                engin.save(data)
             }
             if let observer = self.CONFIG.sensorObserver{
                 observer.onBatteryDischarging()
             }
             break
         case .charging:
-            self.notificationCenter.post(name: .actionAwareBatteryCharging , object: nil)
+            self.notificationCenter.post(name: .actionAwareBatteryCharging , object: self)
             if let engin = self.dbEngine {
                 let data = BatteryCharge()
-                engin.save(data, BatteryCharge.TABLE_NAME)
+                engin.save(data)
             }
             if let observer = self.CONFIG.sensorObserver{
                 observer.onBatteryCharging()
             }
             break
         case .full:
-            self.notificationCenter.post(name: .actionAwareBatteryFull , object: nil)
+            self.notificationCenter.post(name: .actionAwareBatteryFull , object: self)
             break
         }
-        self.notificationCenter.post(name: .actionAwareBattery, object: nil)
+        self.notificationCenter.post(name: .actionAwareBattery, object: self)
     }
     
     @objc func batteryLevelDidChange(notification: NSNotification){
@@ -256,7 +296,7 @@ public class BatterySensor: AwareSensor {
         }
         
         if let engin = self.dbEngine {
-            engin.save(data, BatteryData.TABLE_NAME)
+            engin.save(data)
         }
         
         if let observer = self.CONFIG.sensorObserver{
@@ -264,18 +304,18 @@ public class BatterySensor: AwareSensor {
         }
 
         if currentBatteryLevel < 15 {
-            self.notificationCenter.post(name: .actionAwareBatteryLow , object: nil)
+            self.notificationCenter.post(name: .actionAwareBatteryLow , object: self)
             if let observer = self.CONFIG.sensorObserver{
                 observer.onBatteryLow()
             }
         }
-        self.notificationCenter.post(name: .actionAwareBattery, object: nil)
+        self.notificationCenter.post(name: .actionAwareBattery, object: self)
     }
     
-    public func set(label:String){
+    public override func set(label:String){
         self.CONFIG.label = label
         self.notificationCenter.post(name: .actionAwareBatterySetLabel,
-                                     object: nil,
+                                     object: self,
                                      userInfo: [BatterySensor.EXTRA_LABEL:label])
     }
     
