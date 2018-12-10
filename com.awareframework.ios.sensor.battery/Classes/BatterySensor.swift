@@ -249,6 +249,7 @@ public class BatterySensor: AwareSensor {
             self.notificationCenter.post(name: .actionAwareBatteryDischarging , object: self)
             if let engin = self.dbEngine {
                 let data = BatteryDischarge()
+                data.label = self.CONFIG.label
                 engin.save(data)
             }
             if let observer = self.CONFIG.sensorObserver{
@@ -259,6 +260,7 @@ public class BatterySensor: AwareSensor {
             self.notificationCenter.post(name: .actionAwareBatteryCharging , object: self)
             if let engin = self.dbEngine {
                 let data = BatteryCharge()
+                data.label = self.CONFIG.label
                 engin.save(data)
             }
             if let observer = self.CONFIG.sensorObserver{
@@ -280,6 +282,7 @@ public class BatterySensor: AwareSensor {
         let data = BatteryData()
         data.level = currentBatteryLevel
         data.scale = 100
+        data.label = self.CONFIG.label
         switch currentBatteryState{
         case .unknown:
             data.status = 1

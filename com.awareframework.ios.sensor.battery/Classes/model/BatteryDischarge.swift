@@ -9,5 +9,5 @@ import UIKit
 import com_awareframework_ios_sensor_core
 
 public class BatteryDischarge: AwareObject {
-    public static var TABLE_NAME = "batteryDischarge"
+    public static var TABLE_NAME = "batteryDischargeData"
 }
