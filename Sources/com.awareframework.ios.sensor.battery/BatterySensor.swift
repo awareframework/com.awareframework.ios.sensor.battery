@@ -6,7 +6,7 @@
 //
 
 import UIKit
-import com_awareframework_ios_sensor_core
+import com_awareframework_ios_core
 import SwiftyJSON
 
 extension Notification.Name {
@@ -190,10 +190,10 @@ public class BatterySensor: AwareSensor {
                 config.debug = self.CONFIG.debug
                 config.dispatchQueue = DispatchQueue(label: "com.awareframework.ios.sensor.barometer.sync.queue")
             }
-            engin.startSync(BatteryData.TABLE_NAME, BatteryData.self, config.apply{config in
+            engin.startSync(config.apply{config in
                 config.completionHandler = { (status, error) in
                     var userInfo: Dictionary<String,Any> = ["status":status,
-                                                            "tableName":BatteryData.TABLE_NAME,
+                                                            "tableName":BatteryData.databaseTableName,
                                                             "objectType":BatteryData.self]
                     if let e = error {
                         userInfo["error"] = e
@@ -203,10 +203,10 @@ public class BatterySensor: AwareSensor {
                                                  userInfo:userInfo)
                 }
             })
-            engin.startSync(BatteryCharge.TABLE_NAME, BatteryCharge.self, config.apply{config in
+            engin.startSync(config.apply{config in
                 config.completionHandler = { (status, error) in
                     var userInfo: Dictionary<String,Any> = ["status":status,
-                                                            "tableName":BatteryCharge.TABLE_NAME,
+                                                            "tableName":BatteryCharge.databaseTableName,
                                                             "objectType":BatteryCharge.self]
                     if let e = error {
                         userInfo["error"] = e
@@ -216,10 +216,10 @@ public class BatterySensor: AwareSensor {
                                                  userInfo:userInfo)
                 }
             })
-            engin.startSync(BatteryDischarge.TABLE_NAME, BatteryDischarge.self, config.apply{config in
+            engin.startSync(config.apply{config in
                 config.completionHandler = { (status, error) in
                     var userInfo: Dictionary<String,Any> = ["status":status,
-                                                           "tableName":BatteryDischarge.TABLE_NAME,
+                                                           "tableName":BatteryDischarge.databaseTableName,
                                                            "objectType":BatteryDischarge.self]
                     if let e = error {
                         userInfo["error"] = e
@@ -248,9 +248,9 @@ public class BatterySensor: AwareSensor {
         case .unplugged:
             self.notificationCenter.post(name: .actionAwareBatteryDischarging , object: self)
             if let engin = self.dbEngine {
-                let data = BatteryDischarge()
+                var data = BatteryDischarge()
                 data.label = self.CONFIG.label
-                engin.save(data)
+                engin.save([data])
             }
             if let observer = self.CONFIG.sensorObserver{
                 observer.onBatteryDischarging()
@@ -259,9 +259,9 @@ public class BatterySensor: AwareSensor {
         case .charging:
             self.notificationCenter.post(name: .actionAwareBatteryCharging , object: self)
             if let engin = self.dbEngine {
-                let data = BatteryCharge()
+                var data = BatteryCharge()
                 data.label = self.CONFIG.label
-                engin.save(data)
+                engin.save([data])
             }
             if let observer = self.CONFIG.sensorObserver{
                 observer.onBatteryCharging()
@@ -279,7 +279,7 @@ public class BatterySensor: AwareSensor {
         let currentBatteryLevel:Int = Int(UIDevice.current.batteryLevel * 100);
         let currentBatteryState = UIDevice.current.batteryState
         
-        let data = BatteryData()
+        var data = BatteryData()
         data.level = currentBatteryLevel
         data.scale = 100
         data.label = self.CONFIG.label
@@ -299,9 +299,9 @@ public class BatterySensor: AwareSensor {
         }
         
         if let engin = self.dbEngine {
-            engin.save(data)
+            engin.save([data])
         }
-        
+
         if let observer = self.CONFIG.sensorObserver{
             observer.onBatteryChanged(data: data)
         }
