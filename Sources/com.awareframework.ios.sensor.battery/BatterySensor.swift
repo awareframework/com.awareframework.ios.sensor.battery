@@ -151,6 +151,9 @@ public class BatterySensor: AwareSensor {
         super.init()
         CONFIG = config
         initializeDbEngine(config: config)
+        super.syncConfig = DbSyncConfig().apply { c in
+            c.dispatchQueue = DispatchQueue(label: "com.awareframework.ios.sensor.battery.sync.queue")
+        }
         UIDevice.current.isBatteryMonitoringEnabled = true
     }
     
@@ -185,52 +188,36 @@ public class BatterySensor: AwareSensor {
     }
     
     override public func sync(force: Bool = false) {
-        if let engin = self.dbEngine {
-            let config = DbSyncConfig.init().apply{ config in
-                config.debug = self.CONFIG.debug
-                config.dispatchQueue = DispatchQueue(label: "com.awareframework.ios.sensor.barometer.sync.queue")
+        guard let engine = self.dbEngine, let syncConfig = self.syncConfig else { return }
+        syncConfig.debug = self.CONFIG.debug
+        engine.startSync(syncConfig.apply { config in
+            config.completionHandler = { (status, error) in
+                var userInfo: Dictionary<String,Any> = ["status": status,
+                                                        "tableName": BatteryData.databaseTableName,
+                                                        "objectType": BatteryData.self]
+                if let e = error { userInfo["error"] = e }
+                self.notificationCenter.post(name: .actionAwareBatterySyncCompletion, object: self, userInfo: userInfo)
             }
-            engin.startSync(config.apply{config in
-                config.completionHandler = { (status, error) in
-                    var userInfo: Dictionary<String,Any> = ["status":status,
-                                                            "tableName":BatteryData.databaseTableName,
-                                                            "objectType":BatteryData.self]
-                    if let e = error {
-                        userInfo["error"] = e
-                    }
-                    self.notificationCenter.post(name: .actionAwareBatterySyncCompletion ,
-                                                 object: self,
-                                                 userInfo:userInfo)
-                }
-            })
-            engin.startSync(config.apply{config in
-                config.completionHandler = { (status, error) in
-                    var userInfo: Dictionary<String,Any> = ["status":status,
-                                                            "tableName":BatteryCharge.databaseTableName,
-                                                            "objectType":BatteryCharge.self]
-                    if let e = error {
-                        userInfo["error"] = e
-                    }
-                    self.notificationCenter.post(name: .actionAwareBatterySyncCompletion ,
-                                                 object: self,
-                                                 userInfo:userInfo)
-                }
-            })
-            engin.startSync(config.apply{config in
-                config.completionHandler = { (status, error) in
-                    var userInfo: Dictionary<String,Any> = ["status":status,
-                                                           "tableName":BatteryDischarge.databaseTableName,
-                                                           "objectType":BatteryDischarge.self]
-                    if let e = error {
-                        userInfo["error"] = e
-                    }
-                    self.notificationCenter.post(name: .actionAwareBatterySyncCompletion ,
-                                                 object: self,
-                                                 userInfo:userInfo)
-                }
-            })
-            self.notificationCenter.post(name: .actionAwareBatterySync , object: self)
-        }
+        })
+        engine.startSync(syncConfig.apply { config in
+            config.completionHandler = { (status, error) in
+                var userInfo: Dictionary<String,Any> = ["status": status,
+                                                        "tableName": BatteryCharge.databaseTableName,
+                                                        "objectType": BatteryCharge.self]
+                if let e = error { userInfo["error"] = e }
+                self.notificationCenter.post(name: .actionAwareBatterySyncCompletion, object: self, userInfo: userInfo)
+            }
+        })
+        engine.startSync(syncConfig.apply { config in
+            config.completionHandler = { (status, error) in
+                var userInfo: Dictionary<String,Any> = ["status": status,
+                                                        "tableName": BatteryDischarge.databaseTableName,
+                                                        "objectType": BatteryDischarge.self]
+                if let e = error { userInfo["error"] = e }
+                self.notificationCenter.post(name: .actionAwareBatterySyncCompletion, object: self, userInfo: userInfo)
+            }
+        })
+        self.notificationCenter.post(name: .actionAwareBatterySync, object: self)
     }
     
     /////////

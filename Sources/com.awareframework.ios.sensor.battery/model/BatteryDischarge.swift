@@ -10,7 +10,7 @@ public struct BatteryDischarge: BaseDbModelSQLite {
     public var timezone: Int = AwareUtils.getTimeZone()
     public var os: String = "iOS"
     public var jsonVersion: Int = 1
-    public static let databaseTableName = "batteryDischargeData"
+    public static let databaseTableName = "ios_battery_discharge"
 
     public init() {}
     public init(_ dict: Dictionary<String, Any>) {

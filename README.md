@@ -75,39 +75,36 @@ Class to hold the configuration of the sensor.
 | Field       | Type   | Description                                                                     |
 | ----------- | ------ | ------------------------------------------------------------------------------- |
 | status      | Int    | One of the [iOS’s battery status](https://developer.apple.com/documentation/uikit/uidevice/batterystate) |
-| level       | Int    | Battery level, between 0 and 100                                              |
+| level       | Int    | Battery level, between 0 and 100                                                |
 | scale       | Int    | Maximum battery level                                                           |
 | deviceId    | String | AWARE device UUID                                                               |
 | label       | String | Customizable label. Useful for data calibration or traceability                 |
-| timestamp   | Long   | Unixtime milliseconds since 1970                                                |
-| timezone    | Int    | Timezone  of the device                                          |
-| os          | String | Operating system of the device (ex. android)                                    |
+| timestamp   | Int64  | Unixtime milliseconds since 1970                                                |
+| timezone    | Int    | Timezone of the device                                                          |
+| os          | String | Operating system of the device (ex. ios)                                        |
+| jsonVersion | Int    | JSON schema version                                                             |
 
 ### Battery Discharges
 
-| Field        | Type   | Description                                                     |
-| ------------ | ------ | --------------------------------------------------------------- |
-| start        | Int    | Battery level when the device started discharging               |
-| end          | Int    | Battery level when the device stopped discharging               |
-| endTimestamp | Long   | time instance of the end of discharge                           |
-| deviceId     | String | AWARE device UUID                                               |
-| label        | String | Customizable label. Useful for data calibration or traceability |
-| timestamp    | Long   | Unixtime milliseconds since 1970                                |
-| timezone     | Int    | Timezone of the device                          |
-| os           | String | Operating system of the device (ex. android)                    |
+| Field       | Type   | Description                                                     |
+| ----------- | ------ | --------------------------------------------------------------- |
+| deviceId    | String | AWARE device UUID                                               |
+| label       | String | Customizable label. Useful for data calibration or traceability |
+| timestamp   | Int64  | Unixtime milliseconds since 1970                                |
+| timezone    | Int    | Timezone of the device                                          |
+| os          | String | Operating system of the device (ex. ios)                        |
+| jsonVersion | Int    | JSON schema version                                             |
 
 ### Battery Charge
 
-| Field        | Type   | Description                                                     |
-| ------------ | ------ | --------------------------------------------------------------- |
-| start        | Int    | Battery level when the device started charging                  |
-| end          | Int    | Battery level when the device stopped charging                  |
-| endTimestamp | Long   | time instance of the end of charge                              |
-| deviceId     | String | AWARE device UUID                                               |
-| label        | String | Customizable label. Useful for data calibration or traceability |
-| timestamp    | Long   | Unixtime milliseconds since 1970                                |
-| timezone     | Int    | Timezone  of the device                          |
-| os           | String | Operating system of the device (ex. android)                   
+| Field       | Type   | Description                                                     |
+| ----------- | ------ | --------------------------------------------------------------- |
+| deviceId    | String | AWARE device UUID                                               |
+| label       | String | Customizable label. Useful for data calibration or traceability |
+| timestamp   | Int64  | Unixtime milliseconds since 1970                                |
+| timezone    | Int    | Timezone of the device                                          |
+| os          | String | Operating system of the device (ex. ios)                        |
+| jsonVersion | Int    | JSON schema version                                             |
 
 
 ## Example usage
@@ -116,7 +113,6 @@ Class to hold the configuration of the sensor.
 let batterySensor = BatterySensor.init(BatterySensor.Config().apply{ config in
     config.sensorObserver = Observer()
     config.debug = true
-    config.dbType = .REALM
     // more configuration...
 })
 // To start the sensor
