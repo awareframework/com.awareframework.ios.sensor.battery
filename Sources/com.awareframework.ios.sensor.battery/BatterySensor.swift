@@ -236,6 +236,7 @@ public class BatterySensor: AwareSensor {
             self.notificationCenter.post(name: .actionAwareBatteryDischarging , object: self)
             if let engin = self.dbEngine {
                 var data = BatteryDischarge()
+                data.timestamp = Int64(Date().timeIntervalSince1970 * 1000)
                 data.label = self.CONFIG.label
                 engin.save([data])
             }
@@ -247,6 +248,7 @@ public class BatterySensor: AwareSensor {
             self.notificationCenter.post(name: .actionAwareBatteryCharging , object: self)
             if let engin = self.dbEngine {
                 var data = BatteryCharge()
+                data.timestamp = Int64(Date().timeIntervalSince1970 * 1000)
                 data.label = self.CONFIG.label
                 engin.save([data])
             }
@@ -267,6 +269,7 @@ public class BatterySensor: AwareSensor {
         let currentBatteryState = UIDevice.current.batteryState
         
         var data = BatteryData()
+        data.timestamp = Int64(Date().timeIntervalSince1970 * 1000)
         data.level = currentBatteryLevel
         data.scale = 100
         data.label = self.CONFIG.label
