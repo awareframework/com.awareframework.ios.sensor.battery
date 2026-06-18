@@ -14,7 +14,7 @@ You can integrate this framework into your project via Swift Package Manager (Sw
 
 ### SwiftPM
 1. Open Package Manager Windows
-    * Open `Xcode` -> Select `Menu Bar` -> `File` -> `App Package Dependencies...` 
+    * Open `Xcode` -> Select `Menu Bar` -> `File` -> `App Package Dependencies...`
 
 2. Find the package using the manager
     * Select `Search Package URL` and type `git@github.com:awareframework/com.awareframework.ios.sensor.battery.git`
@@ -26,13 +26,13 @@ You can integrate this framework into your project via Swift Package Manager (Sw
 import com_awareframework_ios_sensor_battery
 ```
 
-## Public functions
+## Public Functions
 
 ### BatterySensor
 
-* `init(config:BatterySensor.Config?)` : Initializes the battery sensor with the optional configuration.
-* `start()`: Starts the battery sensor with the optional configuration.
-* `stop()`: Stops the service.
++ `init(config:BatterySensor.Config?)`: Initializes the battery sensor with the optional configuration.
++ `start()`: Starts the battery sensor with the optional configuration.
++ `stop()`: Stops the service.
 
 ### BatterySensor.Config
 
@@ -41,24 +41,24 @@ Class to hold the configuration of the sensor.
 #### Fields
 
 + `sensorObserver: BatteryObserver`: Callback for live data updates.
-+ `enabled: Boolean` Sensor is enabled or not. (default = `false`)
-+ `debug: Boolean` enable/disable logging to `Logcat`. (default = `false`)
-+ `label: String` Label for the data. (default = "")
-+ `deviceId: String` Id of the device that will be associated with the events and the sensor. (default = "")
-+ `dbEncryptionKey` Encryption key for the database. (default = `null`)
-+ `dbType: Engine` Which db engine to use for saving data. (default = `Engine.DatabaseType.NONE`)
-+ `dbPath: String` Path of the database. (default = "aware_battery")
-+ `dbHost: String` Host for syncing the database. (default = `null`)
++ `enabled: Bool`: Sensor is enabled or not. (default = `false`)
++ `debug: Bool`: Enable/disable logging. (default = `false`)
++ `label: String`: Label for the data. (default = `""`)
++ `deviceId: String`: Id of the device that will be associated with the events and the sensor. (default = `""`)
++ `dbEncryptionKey: String?`: Encryption key for the database. (default = `nil`)
++ `dbType: DatabaseType`: Which db engine to use for saving data. (default = `.none`)
++ `dbPath: String`: Path of the database. (default = `"aware_battery"`)
++ `dbHost: String?`: Host for syncing the database. (default = `nil`)
 
 ## Broadcasts
 
 ### Fired Broadcasts
 
-+ `Battery.ACTION_AWARE_BATTERY_CHANGED` broadcasted when the battery information changes.
-+ `Battery.ACTION_AWARE_BATTERY_CHARGING` broadcasted when the device starts to charge.
-+ `Battery.ACTION_AWARE_BATTERY_DISCHARGING` broadcasted when the device is unplugged and is running on battery.
-+ `Battery.ACTION_AWARE_BATTERY_FULL` broadcasted when the device has finished charging.
-+ `Battery.ACTION_AWARE_BATTERY_LOW` broadcasted when the device is low on battery (15% or less).
++ `Battery.ACTION_AWARE_BATTERY_CHANGED`: broadcasted when the battery information changes.
++ `Battery.ACTION_AWARE_BATTERY_CHARGING`: broadcasted when the device starts to charge.
++ `Battery.ACTION_AWARE_BATTERY_DISCHARGING`: broadcasted when the device is unplugged and is running on battery.
++ `Battery.ACTION_AWARE_BATTERY_FULL`: broadcasted when the device has finished charging.
++ `Battery.ACTION_AWARE_BATTERY_LOW`: broadcasted when the device is low on battery (15% or less).
 
 ### Received Broadcasts
 
@@ -107,10 +107,10 @@ Class to hold the configuration of the sensor.
 | jsonVersion | Int    | JSON schema version                                             |
 
 
-## Example usage
+## Example Usage
 
 ```swift
-let batterySensor = BatterySensor.init(BatterySensor.Config().apply{ config in
+let batterySensor = BatterySensor.init(BatterySensor.Config().apply { config in
     config.sensorObserver = Observer()
     config.debug = true
     // more configuration...
@@ -147,7 +147,7 @@ class Observer:BatteryObserver {
 
 Yuuki Nishiyama (The University of Tokyo), nishiyama@csis.u-tokyo.ac.jp
 
-## Related links
+## Related Links
 * [ Apple | Battery State ](https://developer.apple.com/documentation/uikit/uidevice/batterystate)
 
 ## License
