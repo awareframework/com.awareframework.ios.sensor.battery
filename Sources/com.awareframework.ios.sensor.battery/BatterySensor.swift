@@ -237,22 +237,7 @@ public class BatterySensor: AwareSensor {
     }
 
     private func makeSyncConfig(_ base: DbSyncConfig, tableName: String, objectType: Any.Type) -> DbSyncConfig {
-        let c = DbSyncConfig()
-        c.removeAfterSync = base.removeAfterSync
-        c.batchSize = base.batchSize
-        c.markAsSynced = base.markAsSynced
-        c.skipSyncedData = base.skipSyncedData
-        c.keepLastData = base.keepLastData
-        c.deviceId = base.deviceId
-        c.debug = base.debug
-        c.debugLevel = base.debugLevel
-        c.progressHandler = base.progressHandler
-        c.backgroundSession = base.backgroundSession
-        c.compactDataFormat = base.compactDataFormat
-        c.serverType = base.serverType
-        c.studyNumber = base.studyNumber
-        c.studyKey = base.studyKey
-        c.test = base.test
+        let c = base.copy()
         c.dispatchQueue = DispatchQueue(label: "com.awareframework.ios.sensor.battery.sync.\(tableName)")
         c.completionHandler = { (status, error) in
             var userInfo: Dictionary<String,Any> = ["status": status,
