@@ -123,6 +123,7 @@ public class BatterySensor: AwareSensor {
         public override init() {
             super.init()
             dbPath = "aware_battery"
+            dbTableName = BatteryData.databaseTableName
         }
     
         public func apply(closure:(_ config: BatterySensor.Config ) -> Void ) -> Self {
@@ -147,14 +148,51 @@ public class BatterySensor: AwareSensor {
         self.init(BatterySensor.Config())
     }
     
+    /// The tables this sensor writes, and the object type stored in each.
+    static let tables: [(name: String, type: Any.Type)] = [
+        (BatteryData.databaseTableName, BatteryData.self),
+        (BatteryCharge.databaseTableName, BatteryCharge.self),
+        (BatteryDischarge.databaseTableName, BatteryDischarge.self),
+    ]
+
+    /// One engine per table, used for upload. An engine uploads only the table named in its config,
+    /// so each table needs its own engine. `dbEngine` is reused for the table it already names.
+    var syncEngines: [String: Engine] = [:]
+
     public init(_ config:BatterySensor.Config){
         super.init()
         CONFIG = config
+        if config.dbTableName == nil {
+            config.dbTableName = BatteryData.databaseTableName
+        }
         initializeDbEngine(config: config)
+        initializeTables()
+        for table in BatterySensor.tables {
+            if let engine = dbEngine, engine.config.tableName == table.name {
+                syncEngines[table.name] = engine
+            } else {
+                syncEngines[table.name] = Engine.Builder()
+                    .setPath(config.dbPath)
+                    .setType(config.dbType)
+                    .setHost(config.dbHost)
+                    .setEncryptionKey(config.dbEncryptionKey)
+                    .setTableName(table.name)
+                    .build()
+            }
+        }
         super.syncConfig = DbSyncConfig().apply { c in
             c.dispatchQueue = DispatchQueue(label: "com.awareframework.ios.sensor.battery.sync.queue")
         }
         UIDevice.current.isBatteryMonitoringEnabled = true
+    }
+
+    /// Creates the three battery tables, so that the first save does not fail.
+    private func initializeTables() {
+        guard CONFIG.dbType == .sqlite,
+              let queue = (dbEngine as? SQLiteEngine)?.getSQLiteInstance() else { return }
+        try? BatteryData.createTable(queue: queue)
+        try? BatteryCharge.createTable(queue: queue)
+        try? BatteryDischarge.createTable(queue: queue)
     }
     
     deinit {
@@ -187,37 +225,43 @@ public class BatterySensor: AwareSensor {
         self.notificationCenter.post(name: .actionAwareBatteryStop , object: self)
     }
     
+    /// Uploads the three battery tables (`ios_battery`, `ios_battery_charge`, `ios_battery_discharge`).
+    /// Each table is uploaded by its own engine with its own sync config and queue.
     override public func sync(force: Bool = false) {
-        guard let engine = self.dbEngine, let syncConfig = self.syncConfig else { return }
-        syncConfig.debug = self.CONFIG.debug
-        engine.startSync(syncConfig.apply { config in
-            config.completionHandler = { (status, error) in
-                var userInfo: Dictionary<String,Any> = ["status": status,
-                                                        "tableName": BatteryData.databaseTableName,
-                                                        "objectType": BatteryData.self]
-                if let e = error { userInfo["error"] = e }
-                self.notificationCenter.post(name: .actionAwareBatterySyncCompletion, object: self, userInfo: userInfo)
-            }
-        })
-        engine.startSync(syncConfig.apply { config in
-            config.completionHandler = { (status, error) in
-                var userInfo: Dictionary<String,Any> = ["status": status,
-                                                        "tableName": BatteryCharge.databaseTableName,
-                                                        "objectType": BatteryCharge.self]
-                if let e = error { userInfo["error"] = e }
-                self.notificationCenter.post(name: .actionAwareBatterySyncCompletion, object: self, userInfo: userInfo)
-            }
-        })
-        engine.startSync(syncConfig.apply { config in
-            config.completionHandler = { (status, error) in
-                var userInfo: Dictionary<String,Any> = ["status": status,
-                                                        "tableName": BatteryDischarge.databaseTableName,
-                                                        "objectType": BatteryDischarge.self]
-                if let e = error { userInfo["error"] = e }
-                self.notificationCenter.post(name: .actionAwareBatterySyncCompletion, object: self, userInfo: userInfo)
-            }
-        })
+        guard let base = self.syncConfig else { return }
+        base.debug = self.CONFIG.debug
+        for table in BatterySensor.tables {
+            syncEngines[table.name]?.startSync(makeSyncConfig(base, tableName: table.name, objectType: table.type))
+        }
         self.notificationCenter.post(name: .actionAwareBatterySync, object: self)
+    }
+
+    private func makeSyncConfig(_ base: DbSyncConfig, tableName: String, objectType: Any.Type) -> DbSyncConfig {
+        let c = DbSyncConfig()
+        c.removeAfterSync = base.removeAfterSync
+        c.batchSize = base.batchSize
+        c.markAsSynced = base.markAsSynced
+        c.skipSyncedData = base.skipSyncedData
+        c.keepLastData = base.keepLastData
+        c.deviceId = base.deviceId
+        c.debug = base.debug
+        c.debugLevel = base.debugLevel
+        c.progressHandler = base.progressHandler
+        c.backgroundSession = base.backgroundSession
+        c.compactDataFormat = base.compactDataFormat
+        c.serverType = base.serverType
+        c.studyNumber = base.studyNumber
+        c.studyKey = base.studyKey
+        c.test = base.test
+        c.dispatchQueue = DispatchQueue(label: "com.awareframework.ios.sensor.battery.sync.\(tableName)")
+        c.completionHandler = { (status, error) in
+            var userInfo: Dictionary<String,Any> = ["status": status,
+                                                    "tableName": tableName,
+                                                    "objectType": objectType]
+            if let e = error { userInfo["error"] = e }
+            self.notificationCenter.post(name: .actionAwareBatterySyncCompletion, object: self, userInfo: userInfo)
+        }
+        return c
     }
     
     /////////
