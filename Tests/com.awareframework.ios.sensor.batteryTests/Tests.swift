@@ -1,5 +1,5 @@
 import XCTest
-import com_awareframework_ios_sensor_battery
+@testable import com_awareframework_ios_sensor_battery
 import com_awareframework_ios_core
 
 class Tests: XCTestCase {
@@ -145,6 +145,73 @@ class Tests: XCTestCase {
     
     
     
+    // MARK: - Tables and sync (one engine per table)
+
+    private func makeSensor(_ path: String, table: String? = nil) -> BatterySensor {
+        BatterySensor(BatterySensor.Config().apply { c in
+            c.dbPath = path
+            c.dbHost = "localhost"
+            if let table { c.dbTableName = table }
+        })
+    }
+
+    func testDefaultTableName() {
+        XCTAssertEqual(BatterySensor.Config().dbTableName, BatteryData.databaseTableName)
+        XCTAssertEqual(BatterySensor().CONFIG.dbTableName, BatteryData.databaseTableName)
+    }
+
+    func testTablesAreCreated() throws {
+        let sensor = makeSensor("battery_test_tables_\(UUID().uuidString)")
+        let engine = try XCTUnwrap(sensor.dbEngine as? SQLiteEngine)
+        for table in [BatteryData.databaseTableName, BatteryCharge.databaseTableName,
+                      BatteryDischarge.databaseTableName] {
+            XCTAssertFalse(try engine.fetchTableSchema(tableName: table).isEmpty, "\(table) is missing")
+        }
+    }
+
+    func testOneSyncEnginePerTable() {
+        let sensor = makeSensor("battery_test_engines_\(UUID().uuidString)")
+        let names = sensor.syncEngines.values.map { $0.config.tableName }
+        XCTAssertEqual(Set(names.compactMap { $0 }),
+                       [BatteryData.databaseTableName, BatteryCharge.databaseTableName,
+                        BatteryDischarge.databaseTableName])
+        XCTAssertEqual(Set(sensor.syncEngines.values.map { ObjectIdentifier($0) }).count, 3)
+        XCTAssertTrue(sensor.syncEngines[BatteryData.databaseTableName] === sensor.dbEngine)
+    }
+
+    func testCustomTableNameIsNotDuplicated() {
+        // An app that points dbTableName at the charge table must not upload that table twice.
+        let sensor = makeSensor("battery_test_custom_\(UUID().uuidString)", table: BatteryCharge.databaseTableName)
+        XCTAssertEqual(sensor.syncEngines.count, 3)
+        XCTAssertTrue(sensor.syncEngines[BatteryCharge.databaseTableName] === sensor.dbEngine)
+    }
+
+    func testSyncUploadsEachTableOnce() {
+        let sensor = makeSensor("battery_test_sync_\(UUID().uuidString)")
+        var charge = BatteryCharge(); charge.timestamp = 1
+        var discharge = BatteryDischarge(); discharge.timestamp = 2
+        var level = BatteryData(); level.timestamp = 3
+        sensor.dbEngine?.save([level, charge, discharge])
+        sensor.syncConfig?.test = true  // run the sync without network access
+
+        let done = expectation(description: "three tables synced")
+        done.expectedFulfillmentCount = 3
+        var tables: [String] = []
+        let lock = NSLock()
+        let observer = NotificationCenter.default.addObserver(
+            forName: .actionAwareBatterySyncCompletion, object: sensor, queue: nil) { note in
+            lock.lock(); defer { lock.unlock() }
+            if let t = note.userInfo?["tableName"] as? String { tables.append(t) }
+            XCTAssertEqual(note.userInfo?["status"] as? Bool, true)
+            done.fulfill()
+        }
+        sensor.sync(force: true)
+        wait(for: [done], timeout: 10)
+        NotificationCenter.default.removeObserver(observer)
+        XCTAssertEqual(tables.sorted(), [BatteryData.databaseTableName, BatteryCharge.databaseTableName,
+                                         BatteryDischarge.databaseTableName].sorted())
+    }
+
     func testSyncModule() throws {
         #if targetEnvironment(simulator)
         throw XCTSkip("This test requires a real device with Realm.")
