@@ -187,12 +187,25 @@ public class BatterySensor: AwareSensor {
     }
 
     /// Creates the three battery tables, so that the first save does not fail.
+    /// Failures are logged: without the tables, battery data cannot be saved or uploaded.
     private func initializeTables() {
-        guard CONFIG.dbType == .sqlite,
-              let queue = (dbEngine as? SQLiteEngine)?.getSQLiteInstance() else { return }
-        try? BatteryData.createTable(queue: queue)
-        try? BatteryCharge.createTable(queue: queue)
-        try? BatteryDischarge.createTable(queue: queue)
+        guard CONFIG.dbType == .sqlite else { return }
+        guard let queue = (dbEngine as? SQLiteEngine)?.getSQLiteInstance() else {
+            print(BatterySensor.TAG, "[Error] Cannot open the database '\(CONFIG.dbPath)'. The battery tables are not created.")
+            return
+        }
+        let tables: [(name: String, create: () throws -> Void)] = [
+            (BatteryData.databaseTableName, { try BatteryData.createTable(queue: queue) }),
+            (BatteryCharge.databaseTableName, { try BatteryCharge.createTable(queue: queue) }),
+            (BatteryDischarge.databaseTableName, { try BatteryDischarge.createTable(queue: queue) }),
+        ]
+        for table in tables {
+            do {
+                try table.create()
+            } catch {
+                print(BatterySensor.TAG, "[Error] Cannot create the table '\(table.name)': \(error)")
+            }
+        }
     }
     
     deinit {
