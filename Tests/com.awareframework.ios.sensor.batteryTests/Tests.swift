@@ -197,12 +197,26 @@ class Tests: XCTestCase {
         let done = expectation(description: "three tables synced")
         done.expectedFulfillmentCount = 3
         var tables: [String] = []
+        var syncIDs: [String] = []
+        var completedTableCounts: [Int] = []
+        var finalNotification: Notification?
         let lock = NSLock()
         let observer = NotificationCenter.default.addObserver(
             forName: .actionAwareBatterySyncCompletion, object: sensor, queue: nil) { note in
             lock.lock(); defer { lock.unlock() }
-            if let t = note.userInfo?["tableName"] as? String { tables.append(t) }
-            XCTAssertEqual(note.userInfo?["status"] as? Bool, true)
+            if let table = note.userInfo?[BatterySensor.EXTRA_TABLE_NAME] as? String {
+                tables.append(table)
+            }
+            if let syncID = note.userInfo?[BatterySensor.EXTRA_SYNC_ID] as? String {
+                syncIDs.append(syncID)
+            }
+            if let count = note.userInfo?[BatterySensor.EXTRA_COMPLETED_TABLE_COUNT] as? Int {
+                completedTableCounts.append(count)
+            }
+            XCTAssertEqual(note.userInfo?[BatterySensor.EXTRA_STATUS] as? Bool, true)
+            if note.userInfo?[BatterySensor.EXTRA_IS_FINAL] as? Bool == true {
+                finalNotification = note
+            }
             done.fulfill()
         }
         sensor.sync(force: true)
@@ -210,6 +224,119 @@ class Tests: XCTestCase {
         NotificationCenter.default.removeObserver(observer)
         XCTAssertEqual(tables.sorted(), [BatteryData.databaseTableName, BatteryCharge.databaseTableName,
                                          BatteryDischarge.databaseTableName].sorted())
+        XCTAssertEqual(Set(syncIDs).count, 1)
+        XCTAssertEqual(completedTableCounts, [1, 2, 3])
+        XCTAssertEqual(
+            finalNotification?.userInfo?[BatterySensor.EXTRA_AGGREGATE_STATUS] as? Bool, true)
+        XCTAssertEqual(
+            finalNotification?.userInfo?[BatterySensor.EXTRA_FAILED_TABLE_NAMES] as? [String], [])
+    }
+
+    func testSyncAfterEngineReinitialization() {
+        let config = BatterySensor.Config().apply { c in
+            c.dbPath = "battery_test_reinitialize_\(UUID().uuidString)"
+        }
+        let sensor = BatterySensor(config)
+        XCTAssertTrue(sensor.syncEngines.values.allSatisfy { $0.config.host == nil })
+
+        config.dbHost = "localhost"
+        sensor.initializeDbEngine(config: config)
+
+        XCTAssertEqual(sensor.syncEngines.count, 3)
+        XCTAssertTrue(sensor.syncEngines.values.allSatisfy { $0.config.host == "localhost" })
+        XCTAssertTrue(sensor.syncEngines[BatteryData.databaseTableName] === sensor.dbEngine)
+
+        var charge = BatteryCharge(); charge.timestamp = 1
+        var discharge = BatteryDischarge(); discharge.timestamp = 2
+        var level = BatteryData(); level.timestamp = 3
+        sensor.dbEngine?.save([level, charge, discharge])
+        sensor.syncConfig?.test = true
+
+        let done = expectation(description: "reinitialized engines complete all tables")
+        done.expectedFulfillmentCount = 3
+        var finalStatus: Bool?
+        let lock = NSLock()
+        let observer = NotificationCenter.default.addObserver(
+            forName: .actionAwareBatterySyncCompletion, object: sensor, queue: nil
+        ) { note in
+            lock.lock(); defer { lock.unlock() }
+            if note.userInfo?[BatterySensor.EXTRA_IS_FINAL] as? Bool == true {
+                finalStatus = note.userInfo?[BatterySensor.EXTRA_AGGREGATE_STATUS] as? Bool
+            }
+            done.fulfill()
+        }
+        sensor.sync(force: true)
+        wait(for: [done], timeout: 10)
+        NotificationCenter.default.removeObserver(observer)
+        XCTAssertEqual(finalStatus, true)
+    }
+
+    func testMissingHostPostsFinalFailure() {
+        let config = BatterySensor.Config().apply { c in
+            c.dbPath = "battery_test_missing_host_\(UUID().uuidString)"
+        }
+        let sensor = BatterySensor(config)
+
+        let done = expectation(description: "missing host reports every table")
+        done.expectedFulfillmentCount = 3
+        var finalNotification: Notification?
+        let lock = NSLock()
+        let observer = NotificationCenter.default.addObserver(
+            forName: .actionAwareBatterySyncCompletion, object: sensor, queue: nil
+        ) { note in
+            lock.lock(); defer { lock.unlock() }
+            if note.userInfo?[BatterySensor.EXTRA_IS_FINAL] as? Bool == true {
+                finalNotification = note
+            }
+            done.fulfill()
+        }
+        sensor.sync(force: true)
+        wait(for: [done], timeout: 2)
+        NotificationCenter.default.removeObserver(observer)
+
+        XCTAssertEqual(
+            finalNotification?.userInfo?[BatterySensor.EXTRA_AGGREGATE_STATUS] as? Bool, false)
+        XCTAssertEqual(
+            Set(finalNotification?.userInfo?[BatterySensor.EXTRA_FAILED_TABLE_NAMES] as? [String] ?? []),
+            Set(BatterySensor.tables.map { $0.name }))
+        XCTAssertNotNil(finalNotification?.userInfo?[BatterySensor.EXTRA_AGGREGATE_ERROR])
+    }
+
+    func testPartialFailureIsPreservedInFinalAggregate() {
+        let config = BatterySensor.Config().apply { c in
+            c.dbPath = "battery_test_partial_failure_\(UUID().uuidString)"
+            c.dbHost = "localhost"
+        }
+        let sensor = BatterySensor(config)
+        sensor.syncConfig?.test = true
+        sensor.syncEngines.removeValue(forKey: BatteryCharge.databaseTableName)?.close()
+
+        let done = expectation(description: "partial failure completes all tables")
+        done.expectedFulfillmentCount = 3
+        var finalNotification: Notification?
+        let lock = NSLock()
+        let observer = NotificationCenter.default.addObserver(
+            forName: .actionAwareBatterySyncCompletion, object: sensor, queue: nil
+        ) { note in
+            lock.lock(); defer { lock.unlock() }
+            if note.userInfo?[BatterySensor.EXTRA_IS_FINAL] as? Bool == true {
+                finalNotification = note
+            }
+            done.fulfill()
+        }
+        sensor.sync(force: true)
+        wait(for: [done], timeout: 10)
+        NotificationCenter.default.removeObserver(observer)
+
+        XCTAssertEqual(
+            finalNotification?.userInfo?[BatterySensor.EXTRA_STATUS] as? Bool, true,
+            "The last table succeeds; aggregateStatus must retain the earlier failure")
+        XCTAssertEqual(
+            finalNotification?.userInfo?[BatterySensor.EXTRA_AGGREGATE_STATUS] as? Bool, false)
+        XCTAssertEqual(
+            finalNotification?.userInfo?[BatterySensor.EXTRA_FAILED_TABLE_NAMES] as? [String],
+            [BatteryCharge.databaseTableName])
+        XCTAssertNotNil(finalNotification?.userInfo?[BatterySensor.EXTRA_AGGREGATE_ERROR])
     }
 
     func testSyncModule() throws {

@@ -49,6 +49,17 @@ public class BatterySensor: AwareSensor {
     
     public static let ACTION_AWARE_BATTERY_SET_LABEL = "com.awareframework.ios.sensor.battery.ACTION_AWARE_BATTERY_SET_LABEL"
     public static var EXTRA_LABEL = "label"
+    public static let EXTRA_STATUS = "status"
+    public static let EXTRA_ERROR = "error"
+    public static let EXTRA_TABLE_NAME = "tableName"
+    public static let EXTRA_OBJECT_TYPE = "objectType"
+    public static let EXTRA_SYNC_ID = "syncID"
+    public static let EXTRA_COMPLETED_TABLE_COUNT = "completedTableCount"
+    public static let EXTRA_TABLE_COUNT = "tableCount"
+    public static let EXTRA_IS_FINAL = "isFinal"
+    public static let EXTRA_AGGREGATE_STATUS = "aggregateStatus"
+    public static let EXTRA_AGGREGATE_ERROR = "aggregateError"
+    public static let EXTRA_FAILED_TABLE_NAMES = "failedTableNames"
     
     public static let ACTION_AWARE_BATTERY_SYNC = "com.awareframework.ios.sensor.battery.ACTION_AWARE_BATTERY_SYNC"
     
@@ -159,14 +170,20 @@ public class BatterySensor: AwareSensor {
     /// so each table needs its own engine. `dbEngine` is reused for the table it already names.
     var syncEngines: [String: Engine] = [:]
 
-    public init(_ config:BatterySensor.Config){
-        super.init()
-        CONFIG = config
-        if config.dbTableName == nil {
-            config.dbTableName = BatteryData.databaseTableName
+    /// Rebuilds every upload engine whenever the app applies a new database configuration.
+    /// AWARE Client restores the server URL after constructing its sensors, so keeping the engines
+    /// created by `init` would leave them with the old (usually nil) host forever.
+    public override func initializeDbEngine(config: SensorConfig) {
+        let currentPrimaryEngine = dbEngine
+        syncEngines.values.forEach { engine in
+            if let currentPrimaryEngine, engine === currentPrimaryEngine { return }
+            engine.close()
         }
-        initializeDbEngine(config: config)
-        initializeTables()
+        syncEngines.removeAll()
+
+        super.initializeDbEngine(config: config)
+        initializeTables(config: config)
+
         for table in BatterySensor.tables {
             if let engine = dbEngine, engine.config.tableName == table.name {
                 syncEngines[table.name] = engine
@@ -180,6 +197,15 @@ public class BatterySensor: AwareSensor {
                     .build()
             }
         }
+    }
+
+    public init(_ config:BatterySensor.Config){
+        super.init()
+        CONFIG = config
+        if config.dbTableName == nil {
+            config.dbTableName = BatteryData.databaseTableName
+        }
+        initializeDbEngine(config: config)
         super.syncConfig = DbSyncConfig().apply { c in
             c.dispatchQueue = DispatchQueue(label: "com.awareframework.ios.sensor.battery.sync.queue")
         }
@@ -188,10 +214,10 @@ public class BatterySensor: AwareSensor {
 
     /// Creates the three battery tables, so that the first save does not fail.
     /// Failures are logged: without the tables, battery data cannot be saved or uploaded.
-    private func initializeTables() {
-        guard CONFIG.dbType == .sqlite else { return }
+    private func initializeTables(config: SensorConfig) {
+        guard config.dbType == .sqlite else { return }
         guard let queue = (dbEngine as? SQLiteEngine)?.getSQLiteInstance() else {
-            print(BatterySensor.TAG, "[Error] Cannot open the database '\(CONFIG.dbPath)'. The battery tables are not created.")
+            print(BatterySensor.TAG, "[Error] Cannot open the database '\(config.dbPath)'. The battery tables are not created.")
             return
         }
         let tables: [(name: String, create: () throws -> Void)] = [
@@ -239,27 +265,147 @@ public class BatterySensor: AwareSensor {
     }
     
     /// Uploads the three battery tables (`ios_battery`, `ios_battery_charge`, `ios_battery_discharge`).
-    /// Each table is uploaded by its own engine with its own sync config and queue.
+    /// Each table keeps its legacy completion notification. The last notification also contains the
+    /// aggregate result so clients can wait for the whole Battery sensor upload to finish.
     override public func sync(force: Bool = false) {
-        guard let base = self.syncConfig else { return }
-        base.debug = self.CONFIG.debug
-        for table in BatterySensor.tables {
-            syncEngines[table.name]?.startSync(makeSyncConfig(base, tableName: table.name, objectType: table.type))
-        }
+        let syncID = UUID().uuidString
         self.notificationCenter.post(name: .actionAwareBatterySync, object: self)
+        guard let base = self.syncConfig else {
+            postUnavailableSyncCompletion(syncID: syncID)
+            return
+        }
+        base.debug = self.CONFIG.debug
+        startSequentialSync(
+            tables: BatterySensor.tables,
+            engines: syncEngines,
+            syncConfig: base,
+            currentIndex: 0,
+            failedTableNames: [],
+            lastError: nil,
+            syncID: syncID)
     }
 
-    private func makeSyncConfig(_ base: DbSyncConfig, tableName: String, objectType: Any.Type) -> DbSyncConfig {
+    private func makeSyncConfig(
+        _ base: DbSyncConfig,
+        tableIndex: Int,
+        tableCount: Int,
+        completionHandler: DbSyncCompletionHandler?
+    ) -> DbSyncConfig {
         let c = base.copy()
-        c.dispatchQueue = DispatchQueue(label: "com.awareframework.ios.sensor.battery.sync.\(tableName)")
-        c.completionHandler = { (status, error) in
-            var userInfo: Dictionary<String,Any> = ["status": status,
-                                                    "tableName": tableName,
-                                                    "objectType": objectType]
-            if let e = error { userInfo["error"] = e }
-            self.notificationCenter.post(name: .actionAwareBatterySyncCompletion, object: self, userInfo: userInfo)
+        c.dispatchQueue = DispatchQueue(
+            label: "com.awareframework.ios.sensor.battery.sync.\(tableIndex)")
+        c.progressHandler = { progress, error in
+            let tableWeight = 1.0 / Double(max(tableCount, 1))
+            let overallProgress =
+                (Double(tableIndex) * tableWeight) + (progress * tableWeight)
+            base.progressHandler?(min(1.0, max(0.0, overallProgress)), error)
         }
+        c.completionHandler = completionHandler
         return c
+    }
+
+    private func startSequentialSync(
+        tables: [(name: String, type: Any.Type)],
+        engines: [String: Engine],
+        syncConfig: DbSyncConfig,
+        currentIndex: Int,
+        failedTableNames: [String],
+        lastError: Error?,
+        syncID: String
+    ) {
+        guard currentIndex < tables.count else { return }
+
+        let table = tables[currentIndex]
+        let completion: DbSyncCompletionHandler = { [weak self] status, error in
+            guard let self else { return }
+            let completedTableCount = currentIndex + 1
+            let isFinal = completedTableCount == tables.count
+            let updatedFailedTableNames =
+                status ? failedTableNames : failedTableNames + [table.name]
+            let completionError: Error?
+            if status == false, error == nil {
+                completionError = syncError("Sync failed for \(table.name)")
+            } else {
+                completionError = error
+            }
+            let aggregateError = completionError ?? lastError
+
+            var userInfo: [String: Any] = [
+                BatterySensor.EXTRA_STATUS: status,
+                BatterySensor.EXTRA_TABLE_NAME: table.name,
+                BatterySensor.EXTRA_OBJECT_TYPE: table.type,
+                BatterySensor.EXTRA_SYNC_ID: syncID,
+                BatterySensor.EXTRA_COMPLETED_TABLE_COUNT: completedTableCount,
+                BatterySensor.EXTRA_TABLE_COUNT: tables.count,
+                BatterySensor.EXTRA_IS_FINAL: isFinal,
+            ]
+            if let completionError {
+                userInfo[BatterySensor.EXTRA_ERROR] = completionError
+            }
+            if isFinal {
+                userInfo[BatterySensor.EXTRA_AGGREGATE_STATUS] =
+                    updatedFailedTableNames.isEmpty
+                userInfo[BatterySensor.EXTRA_FAILED_TABLE_NAMES] = updatedFailedTableNames
+                if let aggregateError {
+                    userInfo[BatterySensor.EXTRA_AGGREGATE_ERROR] = aggregateError
+                }
+            }
+            self.notificationCenter.post(
+                name: .actionAwareBatterySyncCompletion,
+                object: self,
+                userInfo: userInfo)
+
+            guard isFinal == false else { return }
+            self.startSequentialSync(
+                tables: tables,
+                engines: engines,
+                syncConfig: syncConfig,
+                currentIndex: completedTableCount,
+                failedTableNames: updatedFailedTableNames,
+                lastError: aggregateError,
+                syncID: syncID)
+        }
+
+        guard let engine = engines[table.name] else {
+            completion(false, syncError("Sync engine is unavailable for \(table.name)"))
+            return
+        }
+        guard engine.config.host != nil else {
+            completion(false, syncError("Sync host is unavailable for \(table.name)"))
+            return
+        }
+
+        let perTableConfig = makeSyncConfig(
+            syncConfig,
+            tableIndex: currentIndex,
+            tableCount: tables.count,
+            completionHandler: completion)
+        engine.startSync(perTableConfig)
+    }
+
+    private func postUnavailableSyncCompletion(syncID: String) {
+        let error = syncError("Sync configuration is unavailable")
+        notificationCenter.post(
+            name: .actionAwareBatterySyncCompletion,
+            object: self,
+            userInfo: [
+                BatterySensor.EXTRA_STATUS: false,
+                BatterySensor.EXTRA_ERROR: error,
+                BatterySensor.EXTRA_SYNC_ID: syncID,
+                BatterySensor.EXTRA_COMPLETED_TABLE_COUNT: 0,
+                BatterySensor.EXTRA_TABLE_COUNT: BatterySensor.tables.count,
+                BatterySensor.EXTRA_IS_FINAL: true,
+                BatterySensor.EXTRA_AGGREGATE_STATUS: false,
+                BatterySensor.EXTRA_AGGREGATE_ERROR: error,
+                BatterySensor.EXTRA_FAILED_TABLE_NAMES: BatterySensor.tables.map { $0.name },
+            ])
+    }
+
+    private func syncError(_ message: String) -> NSError {
+        NSError(
+            domain: BatterySensor.TAG,
+            code: 1,
+            userInfo: [NSLocalizedDescriptionKey: message])
     }
     
     /////////
@@ -301,6 +447,8 @@ public class BatterySensor: AwareSensor {
         case .full:
             self.notificationCenter.post(name: .actionAwareBatteryFull , object: self)
             break
+        @unknown default:
+            break
         }
         self.notificationCenter.post(name: .actionAwareBattery, object: self)
     }
@@ -328,6 +476,8 @@ public class BatterySensor: AwareSensor {
         case .full:
             data.status = 5
             break
+        @unknown default:
+            data.status = 1
         }
         
         if let engin = self.dbEngine {
